@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { GroupsModule } from './groups/groups.module';
 import { MembershipsModule } from './memberships/memberships.module';
 import { ContributionsModule } from './contributions/contributions.module';
 import { Membership } from './memberships/entities/membership.entity';
@@ -15,14 +16,6 @@ import { Contribution } from './contributions/entities/contribution.entity';
 
 @Module({
   imports: [
-    // TypeORM configuration with SQLite for development
-    // For production, replace with PostgreSQL configuration using environment variables
-    TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: ':memory:', // In-memory database for development
-      entities: [Membership, Group, User, Contribution],
-      synchronize: true, // Auto-create tables (disable in production)
-      logging: false,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -36,12 +29,14 @@ import { Contribution } from './contributions/entities/contribution.entity';
           type: 'postgres',
           host: configService.get<string>('DB_HOST') || 'localhost',
           port: parseInt(configService.get<string>('DB_PORT') || '5432', 10),
-          username: configService.get<string>('DB_USERNAME') || 'postgres',
-          password: configService.get<string>('DB_PASSWORD') || 'postgres',
+          username:
+            configService.get<string>('DB_USERNAME') || 'postgres',
+          password:
+            configService.get<string>('DB_PASSWORD') || 'postgres',
           database: configService.get<string>('DB_NAME') || 'ahjoorxmr',
-          entities: [Membership, Group, User],
-          synchronize: isDevelopment, // Auto-create tables only in development
-          logging: isDevelopment, // Enable logging only in development
+          entities: [Membership, Group, User, Contribution],
+          synchronize: isDevelopment,
+          logging: isDevelopment,
         };
       },
       inject: [ConfigService],
@@ -49,10 +44,11 @@ import { Contribution } from './contributions/entities/contribution.entity';
     HealthModule,
     AuthModule,
     UsersModule,
+    GroupsModule,
     MembershipsModule,
     ContributionsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
