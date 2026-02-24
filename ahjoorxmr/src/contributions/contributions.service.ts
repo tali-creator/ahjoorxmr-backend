@@ -5,6 +5,8 @@ import { Contribution } from './entities/contribution.entity';
 import { Group } from '../groups/entities/group.entity';
 import { WinstonLogger } from '../common/logger/winston.logger';
 import { CreateContributionDto } from './dto/create-contribution.dto';
+import { StellarService } from '../stellar/stellar.service';
+import { ConfigService } from '@nestjs/config';
 
 /**
  * Service responsible for managing contribution operations in ROSCA groups.
@@ -18,7 +20,9 @@ export class ContributionsService {
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
     private readonly logger: WinstonLogger,
-  ) {}
+    private readonly stellarService: StellarService,
+    private readonly configService: ConfigService,
+  ) { }
 
   /**
    * Validates that a group exists.
@@ -59,6 +63,23 @@ export class ContributionsService {
     try {
       // Validate group exists
       await this.validateGroupExists(groupId);
+
+      // Verify contribution if enabled
+      const shouldVerify = this.configService.get<boolean>('VERIFY_CONTRIBUTIONS', true);
+      if (shouldVerify) {
+        const isValid = await this.stellarService.verifyContribution(transactionHash);
+        if (!isValid) {
+          this.logger.warn(
+            `Contribution verification failed for transaction hash ${transactionHash}`,
+            'ContributionsService',
+          );
+          throw new BadRequestException('Transaction hash does not correspond to a valid contribution');
+        }
+        this.logger.log(
+          `Contribution verification successful for transaction hash ${transactionHash}`,
+          'ContributionsService',
+        );
+      }
 
       // Check for duplicate transaction hash
       const existingContribution = await this.contributionRepository.findOne({
@@ -144,7 +165,7 @@ export class ContributionsService {
     );
 
     const whereClause: any = { groupId };
-    
+
     if (round !== undefined) {
       whereClause.roundNumber = round;
     }
@@ -176,7 +197,7 @@ export class ContributionsService {
     );
 
     const contributions = await this.contributionRepository.find({
-      where: { 
+      where: {
         groupId,
         roundNumber: round,
       },
