@@ -10,22 +10,21 @@ import {
   ParseUUIDPipe,
   UseGuards,
   Request,
+  Version,
 } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { CreateMembershipDto } from './dto/create-membership.dto';
 import { MembershipResponseDto } from './dto/membership-response.dto';
-<<<<<<< HEAD
 import { RecordPayoutDto } from './dto/record-payout.dto';
 import { JwtAuthGuard } from '../groups/guards/jwt-auth.guard';
-=======
 import { AuditLog } from '../audit/decorators/audit-log.decorator';
->>>>>>> e501baab80ead3b161b5f012d4fdea180dd18667
 
 /**
  * Controller for managing ROSCA group memberships.
  * Provides REST API endpoints for adding, removing, and listing group members.
  */
-@Controller('api/v1/groups')
+@Controller('groups')
+@Version('1')
 export class MembershipsController {
   constructor(private readonly membershipsService: MembershipsService) {}
 
