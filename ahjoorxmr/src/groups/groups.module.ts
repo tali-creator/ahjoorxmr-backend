@@ -6,6 +6,7 @@ import { Group } from './entities/group.entity';
 import { Membership } from '../memberships/entities/membership.entity';
 import { WinstonLogger } from '../common/logger/winston.logger';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { NotificationsModule } from '../notification/notifications.module';
 
 /**
  * GroupsModule manages ROSCA group entities in the database.
@@ -13,7 +14,10 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
  * Smart contract interactions are handled by a separate Stellar service.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([Group, Membership])],
+    imports: [
+        TypeOrmModule.forFeature([Group, Membership]),
+        NotificationsModule,
+    ],
     controllers: [GroupsController],
     providers: [GroupsService, WinstonLogger, JwtAuthGuard],
     exports: [GroupsService],

@@ -20,6 +20,7 @@ import { StellarModule } from './stellar/stellar.module';
 import { EventListenerModule } from './event-listener/event-listener.module';
 import { CustomThrottlerModule } from './throttler/throttler.module';
 import { AuditModule } from './audit/audit.module';
+import { SeedModule } from './database/seeds/seed.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { AuditModule } from './audit/audit.module';
     StellarModule,
     EventListenerModule,
     AuditModule,
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],

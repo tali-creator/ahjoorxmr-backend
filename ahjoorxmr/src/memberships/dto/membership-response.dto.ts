@@ -54,6 +54,7 @@ export class MembershipResponseDto {
     enum: MembershipStatus,
     example: MembershipStatus.ACTIVE,
   })
+  transactionHash?: string | null;
   status: MembershipStatus;
 
   @ApiProperty({

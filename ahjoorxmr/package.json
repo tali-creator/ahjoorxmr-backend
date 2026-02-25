@@ -21,7 +21,9 @@
     "export:spec": "ts-node scripts/export-openapi-spec.ts",
     "migration:generate": "ts-node --project tsconfig.migration.json scripts/generate-migration.ts",
     "migration:run": "ts-node --project tsconfig.migration.json scripts/run-migrations.ts",
-    "migration:revert": "ts-node --project tsconfig.migration.json scripts/revert-migration.ts"
+    "migration:revert": "ts-node --project tsconfig.migration.json scripts/revert-migration.ts",
+    "seed": "ts-node --project tsconfig.json scripts/seed.ts",
+    "seed:reset": "ts-node --project tsconfig.json scripts/seed-reset.ts"
   },
   "dependencies": {
     "@nestjs-modules/ioredis": "^2.0.2",
