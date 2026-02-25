@@ -20,24 +20,11 @@ import { StellarModule } from './stellar/stellar.module';
 import { EventListenerModule } from './event-listener/event-listener.module';
 import { CustomThrottlerModule } from './throttler/throttler.module';
 import { AuditModule } from './audit/audit.module';
+import { SeedModule } from './database/seeds/seed.module';
 
 @Module({
   imports: [
-
     // ConfigModule must be first to make environment variables available
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
-    // TypeORM configuration with SQLite for development
-    // For production, replace with PostgreSQL configuration using environment variables
-    TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: ':memory:', // In-memory database for development
-      entities: [Membership, Group, User, Contribution],
-      synchronize: true, // Auto-create tables (disable in production)
-      logging: false,
-=======
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -57,9 +44,6 @@ import { AuditModule } from './audit/audit.module';
             configService.get<string>('DB_PASSWORD') || 'postgres',
           database: configService.get<string>('DB_NAME') || 'ahjoorxmr',
           entities: [Membership, Group, User, Contribution, AuditLog],
-
-          synchronize: isDevelopment,
-          logging: isDevelopment,
           synchronize: isDevelopment, // Auto-create tables only in development
           logging: isDevelopment, // Enable logging only in development
         };
@@ -79,6 +63,7 @@ import { AuditModule } from './audit/audit.module';
     StellarModule,
     EventListenerModule,
     AuditModule,
+    SeedModule,
   ],
   controllers: [AppController],
   providers: [AppService],
