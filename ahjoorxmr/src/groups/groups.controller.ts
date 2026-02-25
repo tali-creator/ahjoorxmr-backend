@@ -25,6 +25,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Group } from './entities/group.entity';
 import { Membership } from '../memberships/entities/membership.entity';
 import { MembershipResponseDto } from '../memberships/dto/membership-response.dto';
+import { AuditLog } from '../audit/decorators/audit-log.decorator';
 
 /**
  * Controller for managing ROSCA groups.
@@ -48,6 +49,7 @@ export class GroupsController {
     @Post()
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.CREATED)
+    @AuditLog({ action: 'CREATE', resource: 'GROUP' })
     async createGroup(
         @Request() req: { user: { id: string; walletAddress: string } },
         @Body() createGroupDto: CreateGroupDto,
@@ -127,6 +129,7 @@ export class GroupsController {
      */
     @Patch(':id')
     @UseGuards(JwtAuthGuard)
+    @AuditLog({ action: 'UPDATE', resource: 'GROUP' })
     async update(
         @Request() req: { user: { id: string; walletAddress: string } },
         @Param('id', ParseUUIDPipe) id: string,
@@ -152,6 +155,7 @@ export class GroupsController {
     @Post(':id/activate')
     @UseGuards(JwtAuthGuard)
     @HttpCode(HttpStatus.OK)
+    @AuditLog({ action: 'ACTIVATE', resource: 'GROUP' })
     async activateGroup(
         @Request() req: { user: { id: string; walletAddress: string } },
         @Param('id', ParseUUIDPipe) id: string,
