@@ -15,10 +15,11 @@ import { Membership } from './memberships/entities/membership.entity';
 import { Group } from './groups/entities/group.entity';
 import { User } from './users/entities/user.entity';
 import { Contribution } from './contributions/entities/contribution.entity';
-import { AuditLog } from './scheduler/entities/audit-log.entity';
+import { AuditLog } from './audit/entities/audit-log.entity';
 import { StellarModule } from './stellar/stellar.module';
 import { EventListenerModule } from './event-listener/event-listener.module';
 import { CustomThrottlerModule } from './throttler/throttler.module';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { CustomThrottlerModule } from './throttler/throttler.module';
     ContributionsModule,
     StellarModule,
     EventListenerModule,
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [AppService],

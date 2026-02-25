@@ -12,6 +12,7 @@ import {
 import { MembershipsService } from './memberships.service';
 import { CreateMembershipDto } from './dto/create-membership.dto';
 import { MembershipResponseDto } from './dto/membership-response.dto';
+import { AuditLog } from '../audit/decorators/audit-log.decorator';
 
 /**
  * Controller for managing ROSCA group memberships.
@@ -33,6 +34,7 @@ export class MembershipsController {
    */
   @Post(':id/members')
   @HttpCode(HttpStatus.CREATED)
+  @AuditLog({ action: 'CREATE', resource: 'MEMBERSHIP' })
   async addMember(
     @Param('id', ParseUUIDPipe) groupId: string,
     @Body() createMembershipDto: CreateMembershipDto,
@@ -69,6 +71,7 @@ export class MembershipsController {
    */
   @Delete(':id/members/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditLog({ action: 'DELETE', resource: 'MEMBERSHIP' })
   async removeMember(
     @Param('id', ParseUUIDPipe) groupId: string,
     @Param('userId', ParseUUIDPipe) userId: string,

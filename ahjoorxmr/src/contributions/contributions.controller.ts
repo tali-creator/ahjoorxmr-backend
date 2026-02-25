@@ -5,6 +5,7 @@ import { CreateContributionDto } from './dto/create-contribution.dto';
 import { ContributionResponseDto } from './dto/contribution-response.dto';
 import { ApiKeyGuard } from './guards/api-key.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { AuditLog } from '../audit/decorators/audit-log.decorator';
 
 /**
  * Controller for managing ROSCA group contributions.
@@ -29,6 +30,7 @@ export class ContributionsController {
   @UseGuards(ApiKeyGuard)
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 requests per minute
   @HttpCode(HttpStatus.CREATED)
+  @AuditLog({ action: 'CREATE', resource: 'CONTRIBUTION' })
   async createContribution(
     @Body() createContributionDto: CreateContributionDto,
   ): Promise<ContributionResponseDto> {
