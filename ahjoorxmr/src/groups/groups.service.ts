@@ -12,6 +12,8 @@ import { WinstonLogger } from '../common/logger/winston.logger';
 import { CreateGroupDto } from './dto/create-group.dto';
 import { UpdateGroupDto } from './dto/update-group.dto';
 import { GroupStatus } from './entities/group-status.enum';
+import { NotificationsService } from '../notification/notifications.service';
+import { NotificationType } from '../notification/notification-type.enum';
 
 /**
  * Service responsible for managing ROSCA group operations.
@@ -26,6 +28,7 @@ export class GroupsService {
         @InjectRepository(Membership)
         private readonly membershipRepository: Repository<Membership>,
         private readonly logger: WinstonLogger,
+        private readonly notificationsService: NotificationsService,
     ) { }
 
     /**
@@ -349,5 +352,91 @@ export class GroupsService {
             );
             throw error;
         }
+    }
+
+    /**
+     * Advances the group to the next round.
+     * Only the group admin can advance a round.
+     * All members must have paid their current round contribution.
+     * If currentRound exceeds totalRounds, the group is marked as COMPLETED.
+     *
+     * @param groupId - The UUID of the group
+     * @param adminWallet - Wallet address of the requesting admin
+     * @returns The updated Group entity
+     * @throws NotFoundException if the group doesn't exist
+     * @throws ForbiddenException if the requester is not the group admin
+     * @throws BadRequestException if the group is not ACTIVE or members haven't paid
+     */
+    async advanceRound(groupId: string, adminWallet: string): Promise<Group> {
+        this.logger.log(
+            `Advancing round for group ${groupId} by admin ${adminWallet}`,
+            'GroupsService',
+        );
+
+        const group = await this.groupRepository.findOne({
+            where: { id: groupId },
+            relations: ['memberships'],
+        });
+
+        if (!group) {
+            throw new NotFoundException('Group not found');
+        }
+
+        if (group.adminWallet !== adminWallet) {
+            throw new ForbiddenException('Only the group admin can advance rounds');
+        }
+
+        if (group.status !== GroupStatus.ACTIVE) {
+            throw new BadRequestException('Group must be ACTIVE to advance rounds');
+        }
+
+        const unpaidMembers = group.memberships?.filter(
+            (m) => !m.hasPaidCurrentRound,
+        ) || [];
+
+        if (unpaidMembers.length > 0) {
+            throw new BadRequestException(
+                'All members must pay before advancing to the next round',
+            );
+        }
+
+        group.currentRound += 1;
+
+        if (group.currentRound > group.totalRounds) {
+            group.status = GroupStatus.COMPLETED;
+            this.logger.log(
+                `Group ${groupId} marked as COMPLETED`,
+                'GroupsService',
+            );
+        } else {
+            // Reset payment flags for new round
+            for (const membership of group.memberships || []) {
+                membership.hasPaidCurrentRound = false;
+                await this.membershipRepository.save(membership);
+            }
+
+            // Send notifications
+            for (const membership of group.memberships || []) {
+                await this.notificationsService.notify({
+                    userId: membership.userId,
+                    type: NotificationType.ROUND_OPENED,
+                    title: 'New Round Started',
+                    body: `Round ${group.currentRound} has started for group "${group.name}"`,
+                    metadata: {
+                        groupId: group.id,
+                        round: group.currentRound,
+                    },
+                });
+            }
+        }
+
+        const savedGroup = await this.groupRepository.save(group);
+
+        this.logger.log(
+            `Group ${groupId} advanced to round ${savedGroup.currentRound}`,
+            'GroupsService',
+        );
+
+        return savedGroup;
     }
 }

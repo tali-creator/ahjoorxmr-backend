@@ -143,7 +143,7 @@ export class GroupsController {
     }
 
     /**
-     * Activates a PENDING group if all conditions are met.
+     * Advances a PENDING group if all conditions are met.
      * Only the group admin can activate the group.
      * The group must have enough members to meet the minimum requirement.
      *
@@ -164,6 +164,30 @@ export class GroupsController {
     ): Promise<GroupResponseDto> {
         const adminWallet = req.user.walletAddress || req.user.id;
         const group = await this.groupsService.activateGroup(id, adminWallet);
+        return this.toGroupResponse(group);
+    }
+
+    /**
+     * Advances the group to the next round.
+     * Only the group admin can advance a round.
+     * All members must have paid their current round contribution.
+     *
+     * @param req - Authenticated request object
+     * @param id - The UUID of the group
+     * @returns The updated group
+     * @throws NotFoundException if the group doesn't exist
+     * @throws ForbiddenException if not the group admin
+     * @throws BadRequestException if the group is not ACTIVE or members haven't paid
+     */
+    @Post(':id/advance-round')
+    @UseGuards(JwtAuthGuard)
+    @HttpCode(HttpStatus.OK)
+    async advanceRound(
+        @Request() req: { user: { id: string; walletAddress: string } },
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GroupResponseDto> {
+        const adminWallet = req.user.walletAddress || req.user.id;
+        const group = await this.groupsService.advanceRound(id, adminWallet);
         return this.toGroupResponse(group);
     }
 

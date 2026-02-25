@@ -8,11 +8,15 @@ import {
   Param,
   Body,
   ParseUUIDPipe,
+  UseGuards,
+  Request,
   Version,
 } from '@nestjs/common';
 import { MembershipsService } from './memberships.service';
 import { CreateMembershipDto } from './dto/create-membership.dto';
 import { MembershipResponseDto } from './dto/membership-response.dto';
+import { RecordPayoutDto } from './dto/record-payout.dto';
+import { JwtAuthGuard } from '../groups/guards/jwt-auth.guard';
 import { AuditLog } from '../audit/decorators/audit-log.decorator';
 
 /**
@@ -46,7 +50,6 @@ export class MembershipsController {
       createMembershipDto,
     );
 
-    // Transform entity to response DTO
     return {
       id: membership.id,
       groupId: membership.groupId,
@@ -55,6 +58,7 @@ export class MembershipsController {
       payoutOrder: membership.payoutOrder,
       hasReceivedPayout: membership.hasReceivedPayout,
       hasPaidCurrentRound: membership.hasPaidCurrentRound,
+      transactionHash: membership.transactionHash,
       status: membership.status,
       createdAt: membership.createdAt.toISOString(),
       updatedAt: membership.updatedAt.toISOString(),
@@ -94,7 +98,6 @@ export class MembershipsController {
   ): Promise<MembershipResponseDto[]> {
     const memberships = await this.membershipsService.listMembers(groupId);
 
-    // Transform entities to response DTOs
     return memberships.map((membership) => ({
       id: membership.id,
       groupId: membership.groupId,
@@ -103,9 +106,49 @@ export class MembershipsController {
       payoutOrder: membership.payoutOrder,
       hasReceivedPayout: membership.hasReceivedPayout,
       hasPaidCurrentRound: membership.hasPaidCurrentRound,
+      transactionHash: membership.transactionHash,
       status: membership.status,
       createdAt: membership.createdAt.toISOString(),
       updatedAt: membership.updatedAt.toISOString(),
     }));
+  }
+
+  /**
+   * Records a payout to a member.
+   * Admin-only endpoint that marks a member as having received their payout.
+   *
+   * @param groupId - The UUID of the group
+   * @param recordPayoutDto - Payout details (recipientUserId and transactionHash)
+   * @returns The updated membership with HTTP 200 status
+   * @throws NotFoundException if group or membership doesn't exist
+   * @throws BadRequestException if group is not ACTIVE
+   * @throws ConflictException if member already received payout
+   */
+  @Post(':id/payout')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async recordPayout(
+    @Param('id', ParseUUIDPipe) groupId: string,
+    @Body() recordPayoutDto: RecordPayoutDto,
+  ): Promise<MembershipResponseDto> {
+    const membership = await this.membershipsService.recordPayout(
+      groupId,
+      recordPayoutDto.recipientUserId,
+      recordPayoutDto.transactionHash,
+    );
+
+    return {
+      id: membership.id,
+      groupId: membership.groupId,
+      userId: membership.userId,
+      walletAddress: membership.walletAddress,
+      payoutOrder: membership.payoutOrder,
+      hasReceivedPayout: membership.hasReceivedPayout,
+      hasPaidCurrentRound: membership.hasPaidCurrentRound,
+      transactionHash: membership.transactionHash,
+      status: membership.status,
+      createdAt: membership.createdAt.toISOString(),
+      updatedAt: membership.updatedAt.toISOString(),
+    };
   }
 }

@@ -14,6 +14,7 @@ import { MembershipStatus } from '../../memberships/entities/membership-status.e
 import { WinstonLogger } from '../../common/logger/winston.logger';
 import { CreateGroupDto } from '../dto/create-group.dto';
 import { UpdateGroupDto } from '../dto/update-group.dto';
+import { NotificationsService } from '../../notification/notifications.service';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -96,11 +97,15 @@ describe('GroupsService', () => {
     let groupRepository: MockRepository<Group>;
     let membershipRepository: MockRepository<Membership>;
     let logger: MockLogger;
+    let notificationsService: Partial<NotificationsService>;
 
     beforeEach(async () => {
         groupRepository = createMockRepository<Group>();
         membershipRepository = createMockRepository<Membership>();
         logger = createMockLogger();
+        notificationsService = {
+            notify: jest.fn().mockResolvedValue({}),
+        };
 
         const module: TestingModule = await Test.createTestingModule({
             providers: [
@@ -116,6 +121,10 @@ describe('GroupsService', () => {
                 {
                     provide: WinstonLogger,
                     useValue: logger,
+                },
+                {
+                    provide: NotificationsService,
+                    useValue: notificationsService,
                 },
             ],
         }).compile();
@@ -641,6 +650,164 @@ describe('GroupsService', () => {
                 service.activateGroup(groupId, adminWallet),
             ).rejects.toThrow('DB error');
             expect(logger.error).toHaveBeenCalled();
+        });
+    });
+
+    // -------------------------------------------------------------------------
+    // advanceRound
+    // -------------------------------------------------------------------------
+
+    describe('advanceRound', () => {
+        const groupId = BASE_GROUP_ID;
+        const adminWallet = ADMIN_WALLET;
+
+        it('should advance to next round when all members have paid', async () => {
+            const mockGroup = createMockGroup({
+                status: GroupStatus.ACTIVE,
+                currentRound: 1,
+                totalRounds: 5,
+                memberships: [
+                    createMockMembership({ id: 'member-1', userId: 'user-1', hasPaidCurrentRound: true }),
+                    createMockMembership({ id: 'member-2', userId: 'user-2', hasPaidCurrentRound: true }),
+                ],
+            });
+
+            const advancedGroup = { ...mockGroup, currentRound: 2 } as Group;
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+            membershipRepository.save!.mockResolvedValue({} as any);
+            groupRepository.save!.mockResolvedValue(advancedGroup);
+
+            const result = await service.advanceRound(groupId, adminWallet);
+
+            expect(result.currentRound).toBe(2);
+            expect(result.status).toBe(GroupStatus.ACTIVE);
+            expect(membershipRepository.save).toHaveBeenCalledTimes(2);
+            expect(notificationsService.notify).toHaveBeenCalledTimes(2);
+        });
+
+        it('should mark group as COMPLETED when advancing past totalRounds', async () => {
+            const mockGroup = createMockGroup({
+                status: GroupStatus.ACTIVE,
+                currentRound: 5,
+                totalRounds: 5,
+                memberships: [
+                    createMockMembership({ hasPaidCurrentRound: true }),
+                ],
+            });
+
+            const completedGroup = { ...mockGroup, currentRound: 6, status: GroupStatus.COMPLETED } as Group;
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+            groupRepository.save!.mockResolvedValue(completedGroup);
+
+            const result = await service.advanceRound(groupId, adminWallet);
+
+            expect(result.currentRound).toBe(6);
+            expect(result.status).toBe(GroupStatus.COMPLETED);
+            expect(membershipRepository.save).not.toHaveBeenCalled();
+            expect(notificationsService.notify).not.toHaveBeenCalled();
+        });
+
+        it('should throw NotFoundException when group does not exist', async () => {
+            groupRepository.findOne!.mockResolvedValue(null);
+
+            await expect(service.advanceRound(groupId, adminWallet)).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+
+        it('should throw ForbiddenException when caller is not the admin', async () => {
+            const mockGroup = createMockGroup({
+                status: GroupStatus.ACTIVE,
+                adminWallet: ADMIN_WALLET,
+            });
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+
+            await expect(
+                service.advanceRound(groupId, 'GDIFFERENT_WALLET'),
+            ).rejects.toThrow(ForbiddenException);
+        });
+
+        it('should throw BadRequestException when group is not ACTIVE', async () => {
+            const mockGroup = createMockGroup({
+                status: GroupStatus.PENDING,
+            });
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+
+            await expect(service.advanceRound(groupId, adminWallet)).rejects.toThrow(
+                BadRequestException,
+            );
+        });
+
+        it('should throw BadRequestException when not all members have paid', async () => {
+            const mockGroup = createMockGroup({
+                status: GroupStatus.ACTIVE,
+                currentRound: 1,
+                memberships: [
+                    createMockMembership({ hasPaidCurrentRound: true }),
+                    createMockMembership({ hasPaidCurrentRound: false }),
+                ],
+            });
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+
+            await expect(service.advanceRound(groupId, adminWallet)).rejects.toThrow(
+                BadRequestException,
+            );
+            await expect(service.advanceRound(groupId, adminWallet)).rejects.toThrow(
+                'All members must pay before advancing',
+            );
+        });
+
+        it('should reset hasPaidCurrentRound for all members', async () => {
+            const member1 = createMockMembership({ id: 'member-1', userId: 'user-1', hasPaidCurrentRound: true });
+            const member2 = createMockMembership({ id: 'member-2', userId: 'user-2', hasPaidCurrentRound: true });
+            const mockGroup = createMockGroup({
+                status: GroupStatus.ACTIVE,
+                currentRound: 1,
+                totalRounds: 5,
+                memberships: [member1, member2],
+            });
+
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+            membershipRepository.save!.mockResolvedValue({} as any);
+            groupRepository.save!.mockResolvedValue(mockGroup);
+
+            await service.advanceRound(groupId, adminWallet);
+
+            expect(membershipRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({ hasPaidCurrentRound: false }),
+            );
+        });
+
+        it('should send ROUND_OPENED notification to all members', async () => {
+            const member1 = createMockMembership({ id: 'member-1', userId: 'user-1', hasPaidCurrentRound: true });
+            const member2 = createMockMembership({ id: 'member-2', userId: 'user-2', hasPaidCurrentRound: true });
+            const mockGroup = createMockGroup({
+                name: 'Test Group',
+                status: GroupStatus.ACTIVE,
+                currentRound: 1,
+                totalRounds: 5,
+                memberships: [member1, member2],
+            });
+
+            groupRepository.findOne!.mockResolvedValue(mockGroup);
+            membershipRepository.save!.mockResolvedValue({} as any);
+            groupRepository.save!.mockResolvedValue({ ...mockGroup, currentRound: 2 });
+
+            await service.advanceRound(groupId, adminWallet);
+
+            expect(notificationsService.notify).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'user-1',
+                    type: 'round_opened',
+                    title: 'New Round Started',
+                }),
+            );
+            expect(notificationsService.notify).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'user-2',
+                    type: 'round_opened',
+                }),
+            );
         });
     });
 });
